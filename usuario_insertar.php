@@ -3,15 +3,10 @@ require "model_layer/UsuarioService.php";
 header("Content-Type: application/json");
 
 $service = new UsuarioService();
-
-
 $nombre = $_POST['usuario'];
 $pass = $_POST['password'];
-$esAdmin = $_POST['es_admin']; // Java enviará "1" o "0"
-
-// Recibe el ARCHIVO de imagen (FILES)
+$esAdmin = $_POST['es_admin']; 
 $archivo = $_FILES['imagen'] ?? null;
-
 $resultado = $service->registrarUsuario($nombre, $pass, $esAdmin, $archivo);
 
 if ($resultado) {

@@ -4,7 +4,7 @@ header("Content-Type: application/json");
 
 $service = new EncuestaService();
 
-// Java envía el parámetro 'titulo'
+
 $titulo = $_POST['titulo'] ?? '';
 
 if (!empty($titulo)) {

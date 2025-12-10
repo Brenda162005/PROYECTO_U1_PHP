@@ -8,8 +8,8 @@ $con->set_charset("utf8mb4");
 
 $lista = [];
 
-// --- CORRECCIÓN SQL: Agregamos explícitamente 're.id_encuesta' ---
-$sql = "SELECT re.id_encuesta, re.nombre_usuario, e.titulo 
+// 1. Obtenemos el ID del encabezado (re.id) para poder buscar sus detalles
+$sql = "SELECT re.id as id_encabezado, re.id_encuesta, re.nombre_usuario, e.titulo 
         FROM respuestas_encabezado re 
         JOIN encuestas e ON re.id_encuesta = e.id 
         ORDER BY re.fecha_respuesta DESC";
@@ -18,16 +18,30 @@ $res = $con->query($sql);
 
 if ($res) {
     while ($row = $res->fetch_assoc()) {
+        $idEncabezado = $row['id_encabezado'];
+        
+        $respuestasArray = [];
+        $sqlDetalle = "SELECT p.texto_pregunta, rd.puntuacion 
+                       FROM respuestas_detalle rd
+                       JOIN preguntas p ON rd.id_pregunta = p.id
+                       WHERE rd.id_respuesta_encabezado = $idEncabezado";
+        
+        $resDetalle = $con->query($sqlDetalle);
+        if ($resDetalle) {
+            while ($d = $resDetalle->fetch_assoc()) {
+                
+                $respuestasArray[] = [
+                    "texto_pregunta" => $d['texto_pregunta'], 
+                    "puntuacion" => (int)$d['puntuacion']
+                ];
+            }
+        }
+
         $item = [
-            // --- ESTE ES EL DATO CRUCIAL PARA QUE JAVA FILTRE ---
-            // Usamos la clave "id_encuesta" para que coincida con el @SerializedName de Java
-            "id_encuesta" => (int)$row['id_encuesta'], 
-            
-            // Usamos "titulo" y "nombre_usuario" para coincidir con el modelo Java actualizado
+            "id_encuesta" => (int)$row['id_encuesta'],
             "titulo" => $row['titulo'],
             "nombre_usuario" => $row['nombre_usuario'],
-            
-            "respuestas" => [] // Campo vacío necesario para el constructor de Java
+            "respuestas" => $respuestasArray 
         ];
         $lista[] = $item;
     }

@@ -10,17 +10,12 @@ $jsonRecibido = file_get_contents('php://input');
 $data = json_decode($jsonRecibido, true);
 
 if ($data) {
-    // 1. ID de Encuesta
+   
     $idEncuesta = isset($data['id_encuesta']) ? (int)$data['id_encuesta'] : 0;
     
-    // --- CORRECCIÓN CLAVE AQUÍ ---
-    // Leemos 'nombre_usuario' (que es como lo manda Java)
     $nombreUsuario = $data['nombre_usuario'] ?? $data['nombreUsuario'] ?? 'Anónimo';
-    // -----------------------------
-
+    
     $respuestas = $data['respuestas'] ?? [];
-
-    // Validación extra por si el ID llega en 0
     if ($idEncuesta <= 0) {
         $titulo = $data['tituloEncuesta'] ?? '';
         $stmtB = $con->prepare("SELECT id FROM encuestas WHERE titulo = ?");
@@ -36,14 +31,14 @@ if ($data) {
     if ($idEncuesta > 0) {
         $con->begin_transaction();
         try {
-            // Guardar Encabezado
+           
             $stmtHead = $con->prepare("INSERT INTO respuestas_encabezado (id_encuesta, nombre_usuario, fecha_respuesta) VALUES (?, ?, NOW())");
             $stmtHead->bind_param("is", $idEncuesta, $nombreUsuario);
             $stmtHead->execute();
             $idEncabezado = $con->insert_id;
             $stmtHead->close();
 
-            // Guardar Detalles
+            
             $stmtDetalle = $con->prepare("INSERT INTO respuestas_detalle (id_respuesta_encabezado, id_pregunta, puntuacion) VALUES (?, ?, ?)");
             $stmtBuscaP = $con->prepare("SELECT id FROM preguntas WHERE texto_pregunta = ? AND id_encuesta = ?");
 
@@ -51,7 +46,7 @@ if ($data) {
                 $texto = $r['textoPregunta'];
                 $puntos = $r['puntuacion'];
 
-                // Buscamos la pregunta asegurando que sea de ESTA encuesta
+                
                 $stmtBuscaP->bind_param("si", $texto, $idEncuesta);
                 $stmtBuscaP->execute();
                 $resP = $stmtBuscaP->get_result();

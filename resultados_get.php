@@ -6,52 +6,57 @@ $conexionObj = new Conexion();
 $con = $conexionObj->open();
 $con->set_charset("utf8mb4");
 
-$titulo = $_POST['titulo'] ?? '';
+$idEncuesta = isset($_POST['id_encuesta']) ? $_POST['id_encuesta'] : 0;
 $resultados = [];
 
-if (!empty($titulo)) {
-    // 1. Obtener ID de la encuesta
-    $stmt = $con->prepare("SELECT id FROM encuestas WHERE titulo = ?");
-    $stmt->bind_param("s", $titulo);
-    $stmt->execute();
-    $res = $stmt->get_result();
+if ($idEncuesta > 0) {
     
-    if ($row = $res->fetch_assoc()) {
-        $idEncuesta = $row['id'];
+    $mapaPreguntas = [];
+    $sqlPreguntas = "SELECT p.id, p.texto_pregunta 
+                     FROM preguntas p 
+                     WHERE p.id_encuesta = ? 
+                     AND NOT EXISTS (
+                         SELECT 1 FROM preguntas sub WHERE sub.id_pregunta_padre = p.id
+                     )";
+
+    $stmtP = $con->prepare($sqlPreguntas);
+    $stmtP->bind_param("i", $idEncuesta);
+    $stmtP->execute();
+    $resP = $stmtP->get_result();
+    
+    while ($rowP = $resP->fetch_assoc()) {
+        $mapaPreguntas[$rowP['id']] = [
+            "texto" => $rowP['texto_pregunta'],
+            "votos" => [0, 0, 0, 0, 0] 
+        ];
+    }
+    $stmtP->close();
+
+    
+    $sqlVotos = "SELECT rd.id_pregunta, rd.puntuacion 
+                 FROM respuestas_detalle rd 
+                 JOIN respuestas_encabezado re ON rd.id_respuesta_encabezado = re.id 
+                 WHERE re.id_encuesta = ?"; 
+    
+    $stmtV = $con->prepare($sqlVotos);
+    $stmtV->bind_param("i", $idEncuesta);
+    $stmtV->execute();
+    $resV = $stmtV->get_result();
+
+    while ($rowV = $resV->fetch_assoc()) {
+        $idPreg = $rowV['id_pregunta'];
+        $puntos = (int)$rowV['puntuacion'];
+
         
-        // 2. Inicializar el mapa con ceros para todas las preguntas
-        $stmtP = $con->prepare("SELECT texto_pregunta FROM preguntas WHERE id_encuesta = ?");
-        $stmtP->bind_param("i", $idEncuesta);
-        $stmtP->execute();
-        $resP = $stmtP->get_result();
-        while ($rowP = $resP->fetch_assoc()) {
-            // [1, 2, 3, 4, 5] -> Inicializamos en 0 votos
-            $resultados[$rowP['texto_pregunta']] = [0, 0, 0, 0, 0];
+        if (isset($mapaPreguntas[$idPreg]) && $puntos >= 1 && $puntos <= 5) {
+            $mapaPreguntas[$idPreg]['votos'][$puntos - 1]++;
         }
-        $stmtP->close();
+    }
+    $stmtV->close();
 
-        // 3. Contar los votos reales
-        $sqlVotos = "SELECT p.texto_pregunta, rd.puntuacion 
-                     FROM respuestas_detalle rd 
-                     JOIN preguntas p ON rd.id_pregunta = p.id 
-                     JOIN respuestas_encabezado re ON rd.id_respuesta_encabezado = re.id 
-                     WHERE re.id_encuesta = ?";
-        
-        $stmtV = $con->prepare($sqlVotos);
-        $stmtV->bind_param("i", $idEncuesta);
-        $stmtV->execute();
-        $resV = $stmtV->get_result();
-
-        while ($rowV = $resV->fetch_assoc()) {
-            $pregunta = $rowV['texto_pregunta'];
-            $puntos = (int)$rowV['puntuacion'];
-
-            // Sumar el voto en la posición correcta (puntos 1 a 5)
-            if (isset($resultados[$pregunta]) && $puntos >= 1 && $puntos <= 5) {
-                $resultados[$pregunta][$puntos - 1]++;
-            }
-        }
-        $stmtV->close();
+    foreach ($mapaPreguntas as $id => $datos) {
+        $claveUnica = $datos['texto']; 
+        $resultados[$claveUnica] = $datos['votos'];
     }
 }
 

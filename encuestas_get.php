@@ -8,7 +8,7 @@ $con->set_charset("utf8mb4");
 
 $lista = [];
 
-// Seleccionamos todo
+
 $sql = "SELECT id, titulo, descripcion, esta_publicada, imagen FROM encuestas";
 
 $res = $con->query($sql);
@@ -19,9 +19,6 @@ if ($res) {
             "id" => (int)$row['id'],
             "titulo" => $row['titulo'],
             "descripcion" => $row['descripcion'],
-            
-            // --- CAMBIO CLAVE PARA QUE JAVA ENTIENDA ---
-            // Si vale 1, PHP enviará "true". Si vale 0, enviará "false".
             "esta_publicada" => ($row['esta_publicada'] == 1), 
             
             "imagen" => $row['imagen']
