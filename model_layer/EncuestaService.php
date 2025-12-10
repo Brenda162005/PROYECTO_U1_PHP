@@ -107,7 +107,7 @@ class EncuestaService {
         $stmt->close();
     }
 
-    // BORRAR ENCUESTA (Por Título) 
+    // --- 3. BORRAR ENCUESTA (Corregido para tus tablas reales) ---
     public function borrarEncuesta($titulo) {
         $con = $this->conexion->open();
         $filasAfectadas = 0;
@@ -123,24 +123,32 @@ class EncuestaService {
             if ($row = $result->fetch_assoc()) {
                 $idEncuesta = $row['id'];
                 
-              
+                // Iniciamos transacción
                 $con->begin_transaction();
 
-                // Borrar respuestas primero (Para evitar error de llaves foráneas)
-                $sqlDelRespuestas = "DELETE FROM respuestas WHERE id_pregunta IN (SELECT id FROM preguntas WHERE id_encuesta = ?)";
-                $stmtR = $con->prepare($sqlDelRespuestas);
-                $stmtR->bind_param("i", $idEncuesta);
-                $stmtR->execute();
-                $stmtR->close();
+                // A. Borrar DETALLES de respuestas (Hijos de los encabezados)
+                // Borramos los detalles cuyo encabezado pertenezca a esta encuesta
+                $sqlDelDetalles = "DELETE FROM respuestas_detalle WHERE id_respuesta_encabezado IN (SELECT id FROM respuestas_encabezado WHERE id_encuesta = ?)";
+                $stmtD = $con->prepare($sqlDelDetalles);
+                $stmtD->bind_param("i", $idEncuesta);
+                $stmtD->execute();
+                $stmtD->close();
 
-                // B. Borrar preguntas asociadas
+                // B. Borrar ENCABEZADOS de respuestas (Padres de los detalles)
+                $sqlDelEncabezados = "DELETE FROM respuestas_encabezado WHERE id_encuesta = ?";
+                $stmtH = $con->prepare($sqlDelEncabezados);
+                $stmtH->bind_param("i", $idEncuesta);
+                $stmtH->execute();
+                $stmtH->close();
+
+                // C. Borrar PREGUNTAS
                 $sqlDelPreguntas = "DELETE FROM preguntas WHERE id_encuesta = ?";
                 $stmtP = $con->prepare($sqlDelPreguntas);
                 $stmtP->bind_param("i", $idEncuesta);
                 $stmtP->execute();
                 $stmtP->close();
 
-                // C. Borrar la encuesta
+                // D. Borrar la ENCUESTA final
                 $sqlDelEncuesta = "DELETE FROM encuestas WHERE id = ?";
                 $stmtE = $con->prepare($sqlDelEncuesta);
                 $stmtE->bind_param("i", $idEncuesta);
